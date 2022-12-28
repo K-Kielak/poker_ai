@@ -28,7 +28,6 @@ class UserResults:
     def add_result(
         self,
         strategy_path: str,
-        agent: str,
         state: ShortDeckPokerState,
         og_name_to_name: Dict[str, str],
     ):
@@ -39,13 +38,11 @@ class UserResults:
         ----------
         strategy_path : str
             Path to the strategy.
-        agent : Agent
-            Trainable entity that stores regret and unnormalized strategy.
         state : ShortDeckPokerState
             Current state of the game.
         og_name_to_name : Dict[str, str]
         """
-        ai_key = f"{agent}_{os.path.basename(strategy_path)}"
+        ai_key = f"{os.path.basename(strategy_path)}"
         players = []
         for player_i, player in enumerate(state.players):
             name = og_name_to_name[player.name]

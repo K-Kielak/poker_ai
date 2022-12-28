@@ -18,11 +18,9 @@ from poker_ai.utils.algos import rotate_list
 
 @click.command()
 @click.option('--lut_path', required=True, type=str)
-@click.option('--agent', required=False, default="offline", type=str)
 @click.option('--strategy_path', required=False, default="", type=str)
 def run_terminal_app(
     lut_path: str,
-    agent: str = "offline",
     strategy_path: str = "",
 ):
     """Start up terminal app to play against your poker AI.
@@ -36,13 +34,15 @@ def run_terminal_app(
     ```bash
     python -m poker_ai.terminal.runner                                       \
         --lut_path ./research/blueprint_algo                               \
-        --agent offline                                                      \
         --strategy_path ./agent.joblib                                       \
     ```
     """
     term = Terminal()
     log = AsciiLogger(term)
-    n_players: int = 3
+
+    names = {"left": "BOT 1", "middle": "BOT 2", "right": "HUMAN"}
+    positions = list(names.keys())
+    n_players = len(names)
     state: ShortDeckPokerState = new_game(
         n_players,
         lut_path=lut_path,
@@ -50,20 +50,8 @@ def run_terminal_app(
 
     n_table_rotations: int = 0
     selected_action_i: int = 0
-    positions = ["left", "middle", "right"]
-    names = {"left": "BOT 1", "middle": "BOT 2", "right": "HUMAN"}
-    if agent in {"offline", "online"}:
-        offline_strategy_dict = joblib.load(strategy_path)
-        offline_strategy = offline_strategy_dict['strategy']
-        # Using the more fine grained preflop strategy would be a good idea
-        # for a future improvement
-        # TODO [Kacper] - what do these dels do? Can we remove them?
-        del offline_strategy_dict["pre_flop_strategy"]
-        del offline_strategy_dict["regret"]
-    else:
-        offline_strategy = {}
-
     user_results: UserResults = UserResults()
+    offline_strategy = load_strategy(strategy_path)
     with term.cbreak(), term.hidden_cursor():
         while True:
             # Construct ascii objects to be rendered later.
@@ -133,11 +121,11 @@ def run_terminal_app(
                 elif key.name == "KEY_ENTER":
                     action = legal_actions[selected_action_i]
                     if action == "quit":
-                        user_results.add_result(strategy_path, agent, state, og_name_to_name)
+                        user_results.add_result(strategy_path, state, og_name_to_name)
                         log.info(term.pink("quit"))
                         break
                     elif action == "new game":
-                        user_results.add_result(strategy_path, agent, state, og_name_to_name)
+                        user_results.add_result(strategy_path, state, og_name_to_name)
                         log.clear()
                         log.info(term.green("new game"))
                         state: ShortDeckPokerState = new_game(
@@ -146,33 +134,39 @@ def run_terminal_app(
                         n_table_rotations -= 1
                         if n_table_rotations < 0:
                             n_table_rotations = n_players - 1
+
                     else:
                         log.info(term.green(f"{current_player_name} chose {action}"))
                         state: ShortDeckPokerState = state.apply_action(action)
             else:
-                if agent == "random":
-                    action = random.choice(state.legal_actions)
-                    time.sleep(0.8)
-                elif agent == "offline":
-                    default_strategy = {
-                        action: 1 / len(state.legal_actions)
-                        for action in state.legal_actions
-                    }
-                    this_state_strategy = offline_strategy.get(
-                        state.info_set, default_strategy
-                    )
-                    # Normalizing strategy.
-                    total = sum(this_state_strategy.values())
-                    this_state_strategy = {
-                        k: v / total for k, v in this_state_strategy.items()
-                    }
-                    actions = list(this_state_strategy.keys())
-                    probabilties = list(this_state_strategy.values())
-                    action = np.random.choice(actions, p=probabilties)
-                    time.sleep(0.8)
+                default_strategy = {
+                    action: 1 / len(state.legal_actions)
+                    for action in state.legal_actions
+                }
+                this_state_strategy = offline_strategy.get(
+                    state.info_set, default_strategy
+                )
+                # Normalizing strategy.
+                total = sum(this_state_strategy.values())
+                this_state_strategy = {
+                    k: v / total for k, v in this_state_strategy.items()
+                }
+                actions = list(this_state_strategy.keys())
+                probabilties = list(this_state_strategy.values())
+                action = np.random.choice(actions, p=probabilties)
+
                 log.info(f"{current_player_name} chose {action}")
                 state: ShortDeckPokerState = state.apply_action(action)
 
+def load_strategy(strategy_path: str) -> Dict:
+    offline_strategy_dict = joblib.load(strategy_path)
+    offline_strategy = offline_strategy_dict['strategy']
+    # Using the more fine grained preflop strategy would be a good idea
+    # for a future improvement
+    # TODO [Kacper] - what do these dels do? Can we remove them?
+    del offline_strategy_dict["pre_flop_strategy"]
+    del offline_strategy_dict["regret"]
+    return offline_strategy
 
 if __name__ == "__main__":
     run_terminal_app()
