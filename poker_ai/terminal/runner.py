@@ -20,12 +20,10 @@ from poker_ai.utils.algos import rotate_list
 @click.option('--lut_path', required=True, type=str)
 @click.option('--agent', required=False, default="offline", type=str)
 @click.option('--strategy_path', required=False, default="", type=str)
-@click.option('--debug_quick_start/--no_debug_quick_start', default=False)
 def run_terminal_app(
     lut_path: str,
     agent: str = "offline",
     strategy_path: str = "",
-    debug_quick_start: bool = False
 ):
     """Start up terminal app to play against your poker AI.
 
@@ -40,32 +38,31 @@ def run_terminal_app(
         --lut_path ./research/blueprint_algo                               \
         --agent offline                                                      \
         --strategy_path ./agent.joblib                                       \
-        --no_debug_quick_start
     ```
     """
     term = Terminal()
     log = AsciiLogger(term)
     n_players: int = 3
-    if debug_quick_start:
-        state: ShortDeckPokerState = new_game(n_players, load_card_lut=False)
-    else:
-        state: ShortDeckPokerState = new_game(
-            n_players,
-            lut_path=lut_path,
-        )
+    state: ShortDeckPokerState = new_game(
+        n_players,
+        lut_path=lut_path,
+    )
+
     n_table_rotations: int = 0
     selected_action_i: int = 0
     positions = ["left", "middle", "right"]
     names = {"left": "BOT 1", "middle": "BOT 2", "right": "HUMAN"}
-    if not debug_quick_start and agent in {"offline", "online"}:
+    if agent in {"offline", "online"}:
         offline_strategy_dict = joblib.load(strategy_path)
         offline_strategy = offline_strategy_dict['strategy']
         # Using the more fine grained preflop strategy would be a good idea
         # for a future improvement
+        # TODO [Kacper] - what do these dels do? Can we remove them?
         del offline_strategy_dict["pre_flop_strategy"]
         del offline_strategy_dict["regret"]
     else:
         offline_strategy = {}
+
     user_results: UserResults = UserResults()
     with term.cbreak(), term.hidden_cursor():
         while True:
@@ -143,14 +140,9 @@ def run_terminal_app(
                         user_results.add_result(strategy_path, agent, state, og_name_to_name)
                         log.clear()
                         log.info(term.green("new game"))
-                        if debug_quick_start:
-                            state: ShortDeckPokerState = new_game(
-                                n_players, state.card_info_lut, load_card_lut=False,
-                            )
-                        else:
-                            state: ShortDeckPokerState = new_game(
-                                n_players, state.card_info_lut,
-                            )
+                        state: ShortDeckPokerState = new_game(
+                            n_players, state.card_info_lut,
+                        )
                         n_table_rotations -= 1
                         if n_table_rotations < 0:
                             n_table_rotations = n_players - 1
