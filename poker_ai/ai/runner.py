@@ -37,8 +37,6 @@ Options:
                                   strategy.
   --lut_path TEXT                 The path to the files for clustering the
                                   infosets.
-  --pickle_dir TEXT               Whether or not the lut files are pickle
-                                  files. This lookup method is deprecated.
   --single_process / --multi_process
                                   Either use or don't use multiple processes.
   --sync_update_strategy / --async_update_strategy
@@ -107,6 +105,8 @@ def resume(server_config_path: str):
     """
     try:
         config = joblib.load(server_config_path)
+        # Purge pickle dir from legacy config files
+        del config["pickle_dir"]
     except FileNotFoundError:
         raise FileNotFoundError(
             f"Server config file not found at the path: {server_config_path}\n "
@@ -186,14 +186,6 @@ def resume(server_config_path: str):
     ),
 )
 @click.option(
-    "--pickle_dir",
-    default=False,
-    help=(
-        "Whether or not the lut files are pickle files. This lookup "
-        "method is deprecated."
-    ),
-)
-@click.option(
     "--single_process/--multi_process",
     default=False,
     help="Either use or don't use multiple processes.",
@@ -228,7 +220,6 @@ def start(
     dump_iteration: int,
     update_threshold: int,
     lut_path: str,
-    pickle_dir: bool,
     single_process: bool,
     sync_update_strategy: bool,
     sync_cfr: bool,
@@ -251,7 +242,6 @@ def start(
             config=config,
             save_path=save_path,
             lut_path=lut_path,
-            pickle_dir=pickle_dir,
             strategy_interval=strategy_interval,
             n_iterations=n_iterations,
             lcfr_threshold=lcfr_threshold,
@@ -280,7 +270,6 @@ def start(
             update_threshold=update_threshold,
             save_path=save_path,
             lut_path=lut_path,
-            pickle_dir=pickle_dir,
             sync_update_strategy=sync_update_strategy,
             sync_cfr=sync_cfr,
             sync_discount=sync_discount,
