@@ -74,7 +74,7 @@ class Worker(mp.Process):
                 function = self._serialise
             else:
                 raise ValueError(f"Unrecognised function name: {name}")
-            self._update_status(name)
+            self._update_status(name, log_status=(name == "serialise"))
             function(**kwargs)
             # Notify the job queue that the task is done.
             self._job_queue.task_done()
@@ -142,5 +142,6 @@ class Worker(mp.Process):
     def _setup_new_game(self):
         """Setup up new poker game."""
         self._state: state.ShortDeckPokerState = state.new_game(
-            self._n_players, self._info_set_lut,
+            self._n_players,
+            self._info_set_lut,
         )

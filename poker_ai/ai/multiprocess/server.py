@@ -85,6 +85,7 @@ class Server:
         log.info(f"synchronising cfr             - {self._sync_cfr}")
         log.info(f"synchronising discount        - {self._sync_discount}")
         log.info(f"synchronising serialise_agent - {self._sync_serialise}")
+        log.info(f"Parent PID: {os.getpid()}")
         progress_bar_manager = enlighten.get_manager()
         progress_bar = progress_bar_manager.counter(
             total=self._n_iterations, desc="Optimisation iterations", unit="iter"
@@ -115,13 +116,12 @@ class Server:
                 )
             progress_bar.update()
 
-    def terminate(self, safe: bool = False):
+    def terminate(self, safe: bool = True):
         """Kill all workers."""
-        if safe:
-            # Wait for all workers to finish their current jobs.
-            self._job_queue.join()
-            # Ensure all workers are idle.
-            self._wait_until_all_workers_are_idle()
+        # Wait for all workers to finish their current jobs.
+        self._job_queue.join()
+        # Ensure all workers are idle.
+        self._wait_until_all_workers_are_idle()
         # Send the terminate command to all workers.
         for _ in self._workers.values():
             name = "terminate"
@@ -175,7 +175,7 @@ class Server:
         ----------
         job_name : str
             Name of job.
-        sync_wrokers : bool
+        sync_workers : bool
             Whether or not to synchronize workers.
         """
         func = self._syncronised_job if sync_workers else self._send_job

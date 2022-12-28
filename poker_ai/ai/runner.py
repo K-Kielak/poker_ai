@@ -52,7 +52,7 @@ Options:
 """
 import logging
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Optional
 
 import click
 import joblib
@@ -72,8 +72,7 @@ def _safe_search(server: Server):
         server.search()
     except (KeyboardInterrupt, SystemExit):
         log.info(
-            "Early termination of program. Please wait for workers to "
-            "terminate."
+            "Early termination of program. Please wait for workers to " "terminate."
         )
     finally:
         server.terminate()
@@ -92,7 +91,13 @@ def train():
     default="./server.gz",
     help="The path to the previous server.gz file from a previous study.",
 )
-def resume(server_config_path: str):
+@click.option(
+    "--n_iterations",
+    type=int,
+    help="Number of iterations to train for. If not specified, it will use number of "
+    "iterations as defined in the last run.",
+)
+def resume(server_config_path: str, n_iterations: Optional[int]):
     """
     Continue training agent from config loaded from file.
 
@@ -102,16 +107,24 @@ def resume(server_config_path: str):
     ----------
     server_config_path : str
         Path to server configurations.
+    n_iterations : Optional[int]
+        Number of iterations to train for.
     """
     try:
         config = joblib.load(server_config_path)
-        # Purge pickle dir from legacy config files
-        del config["pickle_dir"]
     except FileNotFoundError:
         raise FileNotFoundError(
             f"Server config file not found at the path: {server_config_path}\n "
             f"Please set the path to a valid file dumped by a previous session."
         )
+
+    # Purge pickle dir from legacy config files
+    if "pickle_dir" in config:
+        del config["pickle_dir"]
+
+    if n_iterations is not None:
+        config["n_iterations"] = n_iterations
+
     server = Server.from_dict(config)
     _safe_search(server)
 
@@ -181,9 +194,7 @@ def resume(server_config_path: str):
 @click.option(
     "--lut_path",
     default=".",
-    help=(
-        "The path to the files for clustering the infosets."
-    ),
+    help=("The path to the files for clustering the infosets."),
 )
 @click.option(
     "--single_process/--multi_process",

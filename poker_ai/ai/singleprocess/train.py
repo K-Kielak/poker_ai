@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import random
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Union
 
 import click
 import joblib
@@ -40,7 +40,6 @@ def simple_search(
     config: Dict[str, int],
     save_path: Path,
     lut_path: Union[str, Path],
-    pickle_dir: bool,
     strategy_interval: int,
     n_iterations: int,
     lcfr_threshold: int,
@@ -93,7 +92,6 @@ def simple_search(
                 n_players,
                 card_info_lut,
                 lut_path=lut_path,
-                pickle_dir=pickle_dir
             )
             card_info_lut = state.card_info_lut
             if t > update_threshold and t % strategy_interval == 0:
