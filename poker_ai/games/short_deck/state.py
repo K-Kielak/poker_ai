@@ -5,7 +5,6 @@ import copy
 import json
 import logging
 import operator
-import os
 from typing import Any, Dict, List, Optional, Tuple
 
 import joblib
@@ -76,7 +75,6 @@ class ShortDeckPokerState:
         small_blind: int = 50,
         big_blind: int = 100,
         lut_path: str = ".",
-        pickle_dir: bool = False,
         load_card_lut: bool = True,
     ):
         """Initialise state."""
@@ -87,9 +85,8 @@ class ShortDeckPokerState:
                 f"At least 2 players must be provided but only {n_players} "
                 f"were provided."
             )
-        self._pickle_dir = pickle_dir
         if load_card_lut:
-            self.card_info_lut = self.load_card_lut(lut_path, self._pickle_dir)
+            self.card_info_lut = self.load_card_lut(lut_path)
         else:
             self.card_info_lut = {}
         # Get a reference of the pot from the first player.
@@ -238,7 +235,6 @@ class ShortDeckPokerState:
     @staticmethod
     def load_card_lut(
         lut_path: str = ".",
-        pickle_dir: bool = False
     ) -> Dict[str, Dict[Tuple[int, ...], str]]:
         """
         Load card information lookup table.
@@ -249,40 +245,17 @@ class ShortDeckPokerState:
         ----------
         lut_path : str
             Path to lookupkup table.
-        pickle_dir : bool
-            Whether the lut_path is a path to pickle files or not. Pickle files
-            are deprecated for the lut.
 
         Returns
         -------
         cad_info_lut : InfoSetLookupTable
             Card information cluster lookup table.
         """
-        if pickle_dir:
-            logger.info("Loading card information lut in deprecated way")
-            file_names = [
-                "preflop_lossless.pkl",
-                "flop_lossy_2.pkl",
-                "turn_lossy_2.pkl",
-                "river_lossy_2.pkl",
-            ]
-            betting_stages = ["pre_flop", "flop", "turn", "river"]
-            card_info_lut: Dict[str, Dict[Tuple[int, ...], str]] = {}
-            for file_name, betting_stage in zip(file_names, betting_stages):
-                file_path = os.path.join(lut_path, file_name)
-                if not os.path.isfile(file_path):
-                    raise ValueError(
-                        f"File path not found {file_path}. Ensure lut_path is "
-                        f"set to directory containing pickle files"
-                    )
-                with open(file_path, "rb") as fp:
-                    card_info_lut[betting_stage] = joblib.load(fp)
-        elif lut_path:
+        if lut_path:
             logger.info(f"Loading card from single file at path: {lut_path}")
-            card_info_lut = joblib.load(lut_path + '/card_info_lut.joblib')
-        else:
-            card_info_lut = {}
-        return card_info_lut
+            return joblib.load(lut_path + '/card_info_lut.joblib')
+
+        return {}
 
     def _move_to_next_player(self):
         """Ensure state points to next valid active player."""
@@ -395,10 +368,8 @@ class ShortDeckPokerState:
             key=operator.attrgetter("eval_card"),
             reverse=True,
         )
-        if self._pickle_dir:
-            lookup_cards = tuple([card.eval_card for card in cards])
-        else:
-            lookup_cards = tuple(cards)
+        lookup_cards = tuple(cards)
+
         try:
             cards_cluster = self.card_info_lut[self._betting_stage][lookup_cards]
         except KeyError:

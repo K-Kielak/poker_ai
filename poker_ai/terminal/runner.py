@@ -18,13 +18,11 @@ from poker_ai.utils.algos import rotate_list
 
 @click.command()
 @click.option('--lut_path', required=True, type=str)
-@click.option('--pickle_dir', required=False, default=False, type=bool)
 @click.option('--agent', required=False, default="offline", type=str)
 @click.option('--strategy_path', required=False, default="", type=str)
 @click.option('--debug_quick_start/--no_debug_quick_start', default=False)
 def run_terminal_app(
     lut_path: str,
-    pickle_dir: bool,
     agent: str = "offline",
     strategy_path: str = "",
     debug_quick_start: bool = False
@@ -41,7 +39,6 @@ def run_terminal_app(
     python -m poker_ai.terminal.runner                                       \
         --lut_path ./research/blueprint_algo                               \
         --agent offline                                                      \
-        --pickle_dir ./research/blueprint_algo                               \
         --strategy_path ./agent.joblib                                       \
         --no_debug_quick_start
     ```
@@ -50,12 +47,11 @@ def run_terminal_app(
     log = AsciiLogger(term)
     n_players: int = 3
     if debug_quick_start:
-        state: ShortDeckPokerState = new_game(n_players, {}, load_card_lut=False)
+        state: ShortDeckPokerState = new_game(n_players, load_card_lut=False)
     else:
         state: ShortDeckPokerState = new_game(
             n_players,
             lut_path=lut_path,
-            pickle_dir=pickle_dir
         )
     n_table_rotations: int = 0
     selected_action_i: int = 0
