@@ -22,7 +22,7 @@ InfoSetLookupTable = Dict[str, Dict[Tuple[int, ...], str]]
 
 
 def new_game(
-    n_players: int, card_info_lut: InfoSetLookupTable = {}, **kwargs
+    n_players: int, card_info_lut: Optional[InfoSetLookupTable] = None, **kwargs
 ) -> ShortDeckPokerState:
     """
     Create a new game of short deck poker.
@@ -80,6 +80,7 @@ class ShortDeckPokerState:
         load_card_lut: bool = True,
     ):
         """Initialise state."""
+        logger.info("Initializing ShortDeckPokerState")
         n_players = len(players)
         if n_players <= 1:
             raise ValueError(

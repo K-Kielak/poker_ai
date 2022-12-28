@@ -9,6 +9,7 @@ import enlighten
 
 from poker_ai.ai.agent import Agent
 from poker_ai import utils
+from poker_ai.config import MAX_WORKERS
 from poker_ai.games.short_deck import state
 from poker_ai.ai.multiprocess.worker import Worker
 
@@ -39,7 +40,7 @@ class Server:
         sync_discount: bool = False,
         sync_serialise: bool = False,
         start_timestep: int = 1,
-        n_processes: int = mp.cpu_count() - 1,
+        n_processes: int = MAX_WORKERS,
     ):
         """Set up the optimisation server."""
         self._strategy_interval = strategy_interval

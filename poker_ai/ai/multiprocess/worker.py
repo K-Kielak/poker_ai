@@ -131,7 +131,7 @@ class Worker(mp.Process):
             locks=self._locks,
         )
 
-    def _update_status(self, status, log_status: bool = True):
+    def _update_status(self, status, log_status: bool = False):
         """Update the status of this worker by posting it to the server."""
         if log_status:
             self._logging_queue.put(

@@ -13,6 +13,7 @@ from tqdm import tqdm
 from poker_ai.clustering.card_combos import CardCombos
 from poker_ai.clustering.game_utility import GameUtility
 from poker_ai.clustering.preflop import compute_preflop_lossless_abstraction
+from poker_ai.config import MAX_WORKERS
 
 log = logging.getLogger("poker_ai.clustering.runner")
 
@@ -90,7 +91,7 @@ class CardInfoLutBuilder(CardCombos):
         """Compute river clusters and create lookup table."""
         log.info("Starting computation of river clusters.")
         start = time.time()
-        with concurrent.futures.ProcessPoolExecutor() as executor:
+        with concurrent.futures.ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
             self._river_ehs = list(
                 tqdm(
                     executor.map(
@@ -114,7 +115,7 @@ class CardInfoLutBuilder(CardCombos):
         """Compute turn clusters and create lookup table."""
         log.info("Starting computation of turn clusters.")
         start = time.time()
-        with concurrent.futures.ProcessPoolExecutor() as executor:
+        with concurrent.futures.ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
             self._turn_ehs_distributions = list(
                 tqdm(
                     executor.map(
@@ -136,7 +137,7 @@ class CardInfoLutBuilder(CardCombos):
         """Compute flop clusters and create lookup table."""
         log.info("Starting computation of flop clusters.")
         start = time.time()
-        with concurrent.futures.ProcessPoolExecutor() as executor:
+        with concurrent.futures.ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
             self._flop_potential_aware_distributions = list(
                 tqdm(
                     executor.map(
