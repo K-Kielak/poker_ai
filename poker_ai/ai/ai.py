@@ -337,15 +337,20 @@ def serialise(
     """
     # Load the shared strategy that we accumulate into.
     agent_path = os.path.abspath(str(save_path / f"agent.joblib"))
+    offline_agent = {
+        "regret": {},
+        "timestep": t,
+        "strategy": {},
+        "pre_flop_strategy": {},
+    }
     if os.path.isfile(agent_path):
-        offline_agent = joblib.load(agent_path)
-    else:
-        offline_agent = {
-            "regret": {},
-            "timestep": t,
-            "strategy": {},
-            "pre_flop_strategy": {}
-        }
+        try:
+            locks["file"].acquire()
+            offline_agent = joblib.load(agent_path)
+            locks["file"].release()
+        except Exception:
+            return
+
     # Lock shared dicts so no other process modifies it whilst writing to
     # file.
     # Calculate the strategy for each info sets regret, and accumulate in

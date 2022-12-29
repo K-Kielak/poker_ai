@@ -63,13 +63,17 @@ class Server:
             lut_path
         )
         log.info("Loaded lookup table.")
+
         self._job_queue: mp.JoinableQueue = mp.JoinableQueue(maxsize=n_processes)
         self._status_queue: mp.Queue = mp.Queue()
         self._logging_queue: mp.Queue = mp.Queue()
         self._worker_status: Dict[str, str] = dict()
         self._agent: Agent = Agent(agent_path)
         self._locks: Dict[str, mp.synchronize.Lock] = dict(
-            regret=mp.Lock(), strategy=mp.Lock(), pre_flop_strategy=mp.Lock()
+            regret=mp.Lock(),
+            strategy=mp.Lock(),
+            pre_flop_strategy=mp.Lock(),
+            file=mp.Lock(),
         )
         if os.environ.get("TESTING_SUITE"):
             n_processes = 4
