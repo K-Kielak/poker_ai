@@ -89,25 +89,25 @@ class Worker(mp.Process):
         random_seed: int = int.from_bytes(os.urandom(4), byteorder="little")
         utils.random.seed(random_seed)
 
-    def _cfr(self, t, i):
+    def _cfr(self, iteration, player_i):
         """Search over random game and calculate the strategy."""
         self._setup_new_game()
         use_pruning: bool = np.random.uniform() < 0.95
-        pruning_allowed: bool = t > self._prune_threshold
+        pruning_allowed: bool = iteration > self._prune_threshold
         if pruning_allowed and use_pruning:
-            ai.cfrp(self._agent, self._state, i, t, self._c, self._locks)
+            ai.cfrp(self._agent, self._state, player_i, iteration, self._c, self._locks)
         else:
-            ai.cfr(self._agent, self._state, i, t, self._locks)
+            ai.cfr(self._agent, self._state, player_i, iteration, self._locks)
 
-    def _discount(self, t):
+    def _discount(self, iteration):
         """Discount previous regrets and strategy."""
         # TODO(fedden): Is discount_interval actually set/managed in
         #               minutes here? In Algorithm 1 this should be managed
         #               in minutes using perhaps the time module, but here
         #               it appears to be being managed by the iterations
         #               count.
-        discount_factor = (t / self._discount_interval) / (
-            (t / self._discount_interval) + 1
+        discount_factor = (iteration / self._discount_interval) / (
+            (iteration / self._discount_interval) + 1
         )
         self._locks["regret"].acquire()
         for info_set in self._agent.regret.keys():
@@ -120,16 +120,18 @@ class Worker(mp.Process):
                 self._agent.strategy[info_set][action] *= discount_factor
         self._locks["strategy"].release()
 
-    def _update_strategy(self, t, i):
+    def _update_strategy(self, iteration, player_i):
         """Update the strategy."""
-        ai.update_strategy(self._agent, self._state, i, t, self._locks)
+        ai.update_strategy(self._agent, self._state, player_i, iteration, self._locks)
 
-    def _serialise(self, t: int, server_state: Dict[str, Union[str, float, int, None]]):
+    def _serialise(
+        self, iteration: int, server_state: Dict[str, Union[str, float, int, None]]
+    ):
         """Write progress of optimising agent (and server state) to file."""
         ai.serialise(
             agent=self._agent,
             save_path=self._save_path,
-            t=t,
+            iteration=iteration,
             server_state=server_state,
             locks=self._locks,
         )

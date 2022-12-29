@@ -110,34 +110,50 @@ class Server:
         progress_bar = progress_bar_manager.counter(
             total=self._n_iterations, desc="Optimisation iterations", unit="iter"
         )
-        for t in range(self._start_timestep, self._n_iterations + 1):
+        for iteration in range(self._start_timestep, self._n_iterations + 1):
             # Log any messages from the worker in this master process to avoid
             # weirdness with tqdm.
-            self._update_jobs_and_workers_status(t)
+            self._update_jobs_and_workers_status(iteration)
             while not self._logging_queue.empty():
                 log.info(self._logging_queue.get())
 
             # Optimise for each player's position.
-            for i in range(self._n_players):
-                if t > self._update_threshold and t % self._strategy_interval == 0:
+            for player_i in range(self._n_players):
+                if (
+                    iteration > self._update_threshold
+                    and iteration % self._strategy_interval == 0
+                ):
                     self.job(
                         "update_strategy",
                         sync_workers=self._sync_update_strategy,
-                        t=t,
-                        i=i,
+                        iteration=iteration,
+                        player_i=player_i,
                     )
-                self.job("cfr", sync_workers=self._sync_cfr, t=t, i=i)
-            if t < self._lcfr_threshold & t % self._discount_interval == 0:
-                self.job("discount", sync_workers=self._sync_discount, t=t)
-            if t > self._update_threshold and t % self._dump_iteration == 0:
+                self.job(
+                    "cfr",
+                    sync_workers=self._sync_cfr,
+                    iteration=iteration,
+                    player_i=player_i,
+                )
+            if (
+                iteration < self._lcfr_threshold
+                and iteration % self._discount_interval == 0
+            ):
+                self.job(
+                    "discount", sync_workers=self._sync_discount, iteration=iteration
+                )
+            if (
+                iteration > self._update_threshold
+                and iteration % self._dump_iteration == 0
+            ):
                 self.job(
                     "serialise",
                     sync_workers=self._sync_serialise,
-                    t=t,
+                    iteration=iteration,
                     server_state=self.to_dict(),
                 )
-            if t % self._print_status_interval == 0:
-                self._print_status(t)
+            if iteration % self._print_status_interval == 0:
+                self._print_status(iteration)
             progress_bar.update()
 
     def terminate(self, safe: bool = True):
@@ -278,7 +294,7 @@ class Server:
                 {w: s for w, s in self._worker_status.items() if s.status != "idle"}
             )
 
-    def _print_status(self, curr_iteration: int):
+    def _print_status(self, iteration: int):
         log.info("Jobs statistics:")
         jobs_str = ""
         for name, times in self._job_times.items():
@@ -295,7 +311,7 @@ class Server:
         workers_str = ""
         for name, status in self._worker_status.items():
             last_update = self._worker_status[name]
-            passed_iterations = curr_iteration - last_update.iterationOfLastUpdate
+            passed_iterations = iteration - last_update.iterationOfLastUpdate
             passed_time = timedelta(seconds=time.time() - last_update.timeOfLastUpdate)
             workers_str += (
                 f"\t- {name}: {status.status}; "
@@ -304,18 +320,19 @@ class Server:
             )
         log.info(workers_str)
 
-    def _update_jobs_and_workers_status(self, curr_iteration: int):
+    def _update_jobs_and_workers_status(self, iteration: int):
         while not self._status_queue.empty():
             worker_name, status = self._status_queue.get(block=False)
-            if status not in self._job_times:
-                self._job_times[status] = []
 
             if worker_name in self._worker_status:
                 last_status = self._worker_status[worker_name]
+                if last_status.status not in self._job_times:
+                    self._job_times[last_status.status] = []
+
                 passed_time = time.time() - last_status.timeOfLastUpdate
                 self._job_times[last_status.status].append(passed_time)
 
             # Update worker status
             self._worker_status[worker_name] = WorkerStatus(
-                status, curr_iteration, time.time()
+                status, iteration, time.time()
             )

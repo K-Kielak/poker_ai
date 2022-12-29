@@ -47,18 +47,11 @@ def new_game(
     ]
     if card_info_lut:
         # Don't reload massive files, it takes ages.
-        state = ShortDeckPokerState(
-            players=players,
-            load_card_lut=False,
-            **kwargs
-        )
+        state = ShortDeckPokerState(players=players, load_card_lut=False, **kwargs)
         state.card_info_lut = card_info_lut
     else:
         # Load massive files.
-        state = ShortDeckPokerState(
-            players=players,
-            **kwargs
-        )
+        state = ShortDeckPokerState(players=players, **kwargs)
     return state
 
 
@@ -146,7 +139,7 @@ class ShortDeckPokerState:
         ----------
         action_str : str or None
             The description of the action the current player is making. Can be
-            any of {"fold, "call", "raise"}, the latter two only being possible
+            any of {"fold", "call", "raise"}, the latter two only being possible
             if the agent hasn't folded already.
 
         Returns
@@ -252,7 +245,7 @@ class ShortDeckPokerState:
         """
         if lut_path:
             logger.info(f"Loading card from single file at path: {lut_path}")
-            return joblib.load(lut_path + '/card_info_lut.joblib')
+            return joblib.load(lut_path + "/card_info_lut.joblib")
 
         return {}
 
