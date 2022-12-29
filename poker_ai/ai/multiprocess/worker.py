@@ -57,6 +57,7 @@ class Worker(mp.Process):
         self._set_seed()
         # Start processing loop, that will block on a wait for the next job
         # that will be sent from the server to be consumed by the worker(s).
+        loop_i = 0
         while True:
             # Get the name of the method and the key word arguments needed for
             # the method.
@@ -74,10 +75,12 @@ class Worker(mp.Process):
                 function = self._serialise
             else:
                 raise ValueError(f"Unrecognised function name: {name}")
-            self._update_status(name, log_status=(name == "serialise"))
+
+            self._update_status(name)
             function(**kwargs)
             # Notify the job queue that the task is done.
             self._job_queue.task_done()
+            loop_i += 1
 
     def _set_seed(self):
         """Lose all reproducability as we need unique streams per worker."""

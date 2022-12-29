@@ -1,9 +1,13 @@
 import logging
 import multiprocessing as mp
 import os
+from dataclasses import dataclass
+from datetime import timedelta
+
+import numpy as np
 import time
 from pathlib import Path
-from typing import Dict, Optional, Union
+from typing import Dict, Optional, Union, List
 
 import enlighten
 
@@ -15,6 +19,13 @@ from poker_ai.ai.multiprocess.worker import Worker
 
 log = logging.getLogger("sync.server")
 manager = mp.Manager()
+
+
+@dataclass
+class WorkerStatus:
+    status: str
+    iterationOfLastUpdate: int
+    timeOfLastUpdate: int
 
 
 class Server:
@@ -31,6 +42,7 @@ class Server:
         n_players: int,
         dump_iteration: int,
         update_threshold: int,
+        print_status_interval: int,
         save_path: Union[str, Path],
         lut_path: Union[str, Path] = ".",
         agent_path: Optional[Union[str, Path]] = None,
@@ -51,6 +63,7 @@ class Server:
         self._n_players = n_players
         self._dump_iteration = dump_iteration
         self._update_threshold = update_threshold
+        self._print_status_interval = print_status_interval
         self._save_path = save_path
         self._lut_path = lut_path
         self._agent_path = agent_path
@@ -67,7 +80,10 @@ class Server:
         self._job_queue: mp.JoinableQueue = mp.JoinableQueue(maxsize=n_processes)
         self._status_queue: mp.Queue = mp.Queue()
         self._logging_queue: mp.Queue = mp.Queue()
-        self._worker_status: Dict[str, str] = dict()
+
+        self._worker_status: Dict[str, WorkerStatus] = dict()
+        self._job_times: Dict[str, List[int]] = dict()
+
         self._agent: Agent = Agent(agent_path)
         self._locks: Dict[str, mp.synchronize.Lock] = dict(
             regret=mp.Lock(),
@@ -97,8 +113,10 @@ class Server:
         for t in range(self._start_timestep, self._n_iterations + 1):
             # Log any messages from the worker in this master process to avoid
             # weirdness with tqdm.
+            self._update_jobs_and_workers_status(t)
             while not self._logging_queue.empty():
                 log.info(self._logging_queue.get())
+
             # Optimise for each player's position.
             for i in range(self._n_players):
                 if t > self._update_threshold and t % self._strategy_interval == 0:
@@ -118,6 +136,8 @@ class Server:
                     t=t,
                     server_state=self.to_dict(),
                 )
+            if t % self._print_status_interval == 0:
+                self._print_status(t)
             progress_bar.update()
 
     def terminate(self, safe: bool = True):
@@ -242,12 +262,60 @@ class Server:
             # Read all status updates.
             while not self._status_queue.empty():
                 worker_name, status = self._status_queue.get(block=False)
-                self._worker_status[worker_name] = status
-            # Are all workers idle, all workers statues obtained, if so, stop
-            # waiting.
-            all_idle = all(status == "idle" for status in self._worker_status.values())
+                # Iteration -1 to indicate that status has been
+                # read outside of iteration loop
+                self._worker_status[worker_name] = WorkerStatus(status, -1, time.time())
+
+            # Are all workers idle, all workers statues obtained, if so, stop waiting.
+            all_idle = all(
+                status.status == "idle" for status in self._worker_status.values()
+            )
             all_statuses_obtained = len(self._worker_status) == len(self._workers)
             if all_idle and all_statuses_obtained:
                 break
             time.sleep(sleep_secs)
-            log.info({w: s for w, s in self._worker_status.items() if s != "idle"})
+            log.info(
+                {w: s for w, s in self._worker_status.items() if s.status != "idle"}
+            )
+
+    def _print_status(self, curr_iteration: int):
+        log.info("Jobs statistics:")
+        jobs_str = ""
+        for name, times in self._job_times.items():
+            jobs_str += (
+                f"\t- {name.upper()}: "
+                f"done {len(times)} times, "
+                f"max time {np.max(times):.2f}s, "
+                f"last 10 avg time {np.mean(times[-10:]):.2f}s, "
+                f"avg time {np.mean(times):.2f}s\n"
+            )
+        log.info(jobs_str)
+
+        log.info("Current worker status:")
+        workers_str = ""
+        for name, status in self._worker_status.items():
+            last_update = self._worker_status[name]
+            passed_iterations = curr_iteration - last_update.iterationOfLastUpdate
+            passed_time = timedelta(seconds=time.time() - last_update.timeOfLastUpdate)
+            workers_str += (
+                f"\t- {name}: {status.status}; "
+                f"Last change was {passed_iterations} iterations "
+                f"and {passed_time} (hh:mm:ss) ago.\n"
+            )
+        log.info(workers_str)
+
+    def _update_jobs_and_workers_status(self, curr_iteration: int):
+        while not self._status_queue.empty():
+            worker_name, status = self._status_queue.get(block=False)
+            if status not in self._job_times:
+                self._job_times[status] = []
+
+            if worker_name in self._worker_status:
+                last_status = self._worker_status[worker_name]
+                passed_time = time.time() - last_status.timeOfLastUpdate
+                self._job_times[last_status.status].append(passed_time)
+
+            # Update worker status
+            self._worker_status[worker_name] = WorkerStatus(
+                status, curr_iteration, time.time()
+            )

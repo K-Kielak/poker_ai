@@ -367,7 +367,9 @@ def serialise(
             }
         else:
             for action, probability in strategy.items():
+                # TODO (Kacper) - why is it += probability? It won't be in [0, 1] then
                 offline_agent["strategy"][info_set][action] += probability
+
     if locks:
         locks["regret"].acquire()
     offline_agent["regret"] = copy.deepcopy(agent.regret)
@@ -378,7 +380,10 @@ def serialise(
     offline_agent["pre_flop_strategy"] = copy.deepcopy(agent.strategy)
     if locks:
         locks["pre_flop_strategy"].release()
+
+    locks["file"].acquire()
     joblib.dump(offline_agent, agent_path)
+    locks["file"].release()
     # Dump the server state to file too, but first update a few bits of the
     # state so when we load it next time, we start from the right place in
     # the optimisation process.

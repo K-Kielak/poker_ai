@@ -192,9 +192,14 @@ def resume(server_config_path: str, n_iterations: Optional[int]):
     ),
 )
 @click.option(
+    "--print_status_interval",
+    default=100,
+    help="Print workers status every `print_status_interval` iterations.",
+)
+@click.option(
     "--lut_path",
     default=".",
-    help=("The path to the files for clustering the infosets."),
+    help="The path to the files for clustering the infosets.",
 )
 @click.option(
     "--single_process/--multi_process",
@@ -230,6 +235,7 @@ def start(
     n_players: int,
     dump_iteration: int,
     update_threshold: int,
+    print_status_interval: int,
     lut_path: str,
     single_process: bool,
     sync_update_strategy: bool,
@@ -285,6 +291,7 @@ def start(
             sync_cfr=sync_cfr,
             sync_discount=sync_discount,
             sync_serialise=sync_serialise,
+            print_status_interval=print_status_interval,
         )
         _safe_search(server)
 
