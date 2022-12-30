@@ -85,12 +85,6 @@ class Server:
         self._job_times: Dict[str, List[int]] = dict()
 
         self._agent: Agent = Agent(agent_path)
-        self._locks: Dict[str, mp.synchronize.Lock] = dict(
-            regret=mp.Lock(),
-            strategy=mp.Lock(),
-            pre_flop_strategy=mp.Lock(),
-            file=mp.Lock(),
-        )
         if os.environ.get("TESTING_SUITE"):
             n_processes = 4
         self._workers: Dict[str, Worker] = self._start_workers(n_processes)
@@ -254,7 +248,6 @@ class Server:
                 job_queue=self._job_queue,
                 status_queue=self._status_queue,
                 logging_queue=self._logging_queue,
-                locks=self._locks,
                 agent=self._agent,
                 info_set_lut=self._info_set_lut,
                 n_players=self._n_players,

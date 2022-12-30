@@ -299,11 +299,13 @@ class ShortDeckPokerState:
         """Return all private hands."""
         return {p: p.cards for p in self.players}
 
+    # TODO can we remove it?
     @property
     def initial_regret(self) -> Dict[str, float]:
         """Returns the default regret for this state."""
         return {action: 0 for action in self.legal_actions}
 
+    # TODO can we remove it?
     @property
     def initial_strategy(self) -> Dict[str, float]:
         """Returns the default strategy for this state."""

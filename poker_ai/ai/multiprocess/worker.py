@@ -1,10 +1,8 @@
-import copy
 import multiprocessing as mp
 import os
 from pathlib import Path
 from typing import Dict, Union
 
-import joblib
 import numpy as np
 
 from poker_ai.ai import ai
@@ -21,7 +19,6 @@ class Worker(mp.Process):
         job_queue: mp.Queue,
         status_queue: mp.Queue,
         logging_queue: mp.Queue,
-        locks: Dict[str, mp.synchronize.Lock],
         agent: Agent,
         info_set_lut: state.InfoSetLookupTable,
         n_players: int,
@@ -38,7 +35,6 @@ class Worker(mp.Process):
         self._job_queue: mp.Queue = job_queue
         self._status_queue: mp.Queue = status_queue
         self._logging_queue: mp.Queue = logging_queue
-        self._locks = locks
         self._n_players = n_players
         self._prune_threshold = prune_threshold
         self._agent = agent
@@ -86,18 +82,29 @@ class Worker(mp.Process):
         """Lose all reproducability as we need unique streams per worker."""
         # NOTE(fedden): NumPy in particular has a problem with processes and
         #               seeds: https://github.com/numpy/numpy/issues/9650
-        random_seed: int = int.from_bytes(os.urandom(4), byteorder="little")
+        random_seed = int.from_bytes(os.urandom(4), byteorder="little")
         utils.random.seed(random_seed)
 
     def _cfr(self, iteration, player_i):
         """Search over random game and calculate the strategy."""
         self._setup_new_game()
-        use_pruning: bool = np.random.uniform() < 0.95
-        pruning_allowed: bool = iteration > self._prune_threshold
+        use_pruning = np.random.uniform() < 0.95
+        pruning_allowed = iteration > self._prune_threshold
         if pruning_allowed and use_pruning:
-            ai.cfrp(self._agent, self._state, player_i, iteration, self._c, self._locks)
+            ai.cfr(
+                agent=self._agent,
+                state=self._state,
+                agent_player=player_i,
+                iteration=iteration,
+                pruning_threshold=self._c,
+            )
         else:
-            ai.cfr(self._agent, self._state, player_i, iteration, self._locks)
+            ai.cfr(
+                agent=self._agent,
+                state=self._state,
+                agent_player=player_i,
+                iteration=iteration,
+            )
 
     def _discount(self, iteration):
         """Discount previous regrets and strategy."""
@@ -109,20 +116,11 @@ class Worker(mp.Process):
         discount_factor = (iteration / self._discount_interval) / (
             (iteration / self._discount_interval) + 1
         )
-        self._locks["regret"].acquire()
-        for info_set in self._agent.regret.keys():
-            for action in self._agent.regret[info_set].keys():
-                self._agent.regret[info_set][action] *= discount_factor
-        self._locks["regret"].release()
-        self._locks["strategy"].acquire()
-        for info_set in self._agent.strategy.keys():
-            for action in self._agent.strategy[info_set].keys():
-                self._agent.strategy[info_set][action] *= discount_factor
-        self._locks["strategy"].release()
+        self._agent.discount(discount_factor)
 
     def _update_strategy(self, iteration, player_i):
         """Update the strategy."""
-        ai.update_strategy(self._agent, self._state, player_i, iteration, self._locks)
+        ai.update_strategy(self._agent, self._state, player_i, iteration)
 
     def _serialise(
         self, iteration: int, server_state: Dict[str, Union[str, float, int, None]]
@@ -133,7 +131,6 @@ class Worker(mp.Process):
             save_path=self._save_path,
             iteration=iteration,
             server_state=server_state,
-            locks=self._locks,
         )
 
     def _update_status(self, status, log_status: bool = False):
